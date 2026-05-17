@@ -16,7 +16,8 @@ const nextConfig: NextConfig = {
       allowedOrigins: [
         "localhost:3000",
         "192.168.18.75:3000",
-        "127.0.0.1:3000"
+        "127.0.0.1:3000",
+        "ayojualan.vercel.app"
       ]
     }
   }
