@@ -26,12 +26,32 @@ export async function deleteRecipe(id: string) {
   revalidatePath("/");
 }
 
+export async function updateRecipeName(id: string, name: string) {
+  if (!name.trim()) throw new Error("Nama resep tidak boleh kosong");
+  await prisma.recipe.update({
+    where: { id },
+    data: { name: name.trim() },
+  });
+  revalidatePath("/resep");
+  revalidatePath("/");
+}
+
 export async function updateRecipeMargin(id: string, margin: number) {
   await prisma.recipe.update({
     where: { id },
     data: { margin },
   });
   revalidatePath("/resep");
+}
+
+export async function updateRecipeIngredientAmount(id: string, amount: number) {
+  if (isNaN(amount) || amount <= 0) throw new Error("Jumlah tidak valid");
+  await prisma.recipeIngredient.update({
+    where: { id },
+    data: { amount },
+  });
+  revalidatePath("/resep");
+  revalidatePath("/");
 }
 
 export async function addIngredientToRecipe(formData: FormData) {
@@ -65,26 +85,6 @@ export async function addIngredientToRecipe(formData: FormData) {
     });
   }
 
-  revalidatePath("/resep");
-  revalidatePath("/");
-}
-
-export async function updateRecipeName(id: string, name: string) {
-  if (!name.trim()) throw new Error("Nama resep diperlukan");
-  await prisma.recipe.update({
-    where: { id },
-    data: { name: name.trim() },
-  });
-  revalidatePath("/resep");
-  revalidatePath("/");
-}
-
-export async function updateRecipeIngredientAmount(id: string, amount: number) {
-  if (isNaN(amount) || amount <= 0) throw new Error("Jumlah tidak valid");
-  await prisma.recipeIngredient.update({
-    where: { id },
-    data: { amount },
-  });
   revalidatePath("/resep");
   revalidatePath("/");
 }

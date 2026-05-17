@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { createRecipe, deleteRecipe, updateRecipeMargin, addIngredientToRecipe, removeIngredientFromRecipe } from "@/app/actions/recipe";
+import {
+  createRecipe,
+  deleteRecipe,
+  updateRecipeName,
+  updateRecipeMargin,
+  addIngredientToRecipe,
+  removeIngredientFromRecipe,
+  updateRecipeIngredientAmount,
+} from "@/app/actions/recipe";
 
 type RecipeProps = {
   id: string;
@@ -38,10 +46,24 @@ export default function ResepManager({
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(initialRecipes[0]?.id || null);
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   const [isIngredientModalOpen, setIsIngredientModalOpen] = useState(false);
+  const [isEditRecipeNameOpen, setIsEditRecipeNameOpen] = useState(false);
+  const [isEditIngredientOpen, setIsEditIngredientOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  
+
   // Local state for margin to avoid spamming the server while dragging
   const [localMargin, setLocalMargin] = useState<number | null>(null);
+
+  // Edit recipe name state
+  const [editRecipeName, setEditRecipeName] = useState("");
+
+  // Edit ingredient amount state
+  const [editingIngredient, setEditingIngredient] = useState<{
+    id: string;
+    name: string;
+    unit: string;
+    amount: number;
+  } | null>(null);
+  const [editAmount, setEditAmount] = useState("");
 
   const selectedRecipe = initialRecipes.find(r => r.id === selectedRecipeId);
 
@@ -91,6 +113,53 @@ export default function ResepManager({
     });
   }
 
+  function openEditRecipeName() {
+    if (!selectedRecipe) return;
+    setEditRecipeName(selectedRecipe.name);
+    setIsEditRecipeNameOpen(true);
+  }
+
+  async function handleUpdateRecipeName() {
+    if (!selectedRecipeId || !editRecipeName.trim()) return;
+    startTransition(async () => {
+      try {
+        await updateRecipeName(selectedRecipeId, editRecipeName);
+        setIsEditRecipeNameOpen(false);
+      } catch (err: any) {
+        alert("Gagal memperbarui nama: " + err.message);
+      }
+    });
+  }
+
+  function openEditIngredient(item: RecipeProps["ingredients"][0]) {
+    setEditingIngredient({
+      id: item.id,
+      name: item.ingredient.name,
+      unit: item.ingredient.unit,
+      amount: item.amount,
+    });
+    setEditAmount(String(item.amount));
+    setIsEditIngredientOpen(true);
+  }
+
+  async function handleUpdateIngredientAmount() {
+    if (!editingIngredient) return;
+    const newAmount = parseInt(editAmount);
+    if (isNaN(newAmount) || newAmount <= 0) {
+      alert("Jumlah harus lebih dari 0");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await updateRecipeIngredientAmount(editingIngredient.id, newAmount);
+        setIsEditIngredientOpen(false);
+        setEditingIngredient(null);
+      } catch (err: any) {
+        alert("Gagal memperbarui jumlah: " + err.message);
+      }
+    });
+  }
+
   return (
     <div>
       <h1 className="page-title">Kalkulator Resep</h1>
@@ -121,19 +190,38 @@ export default function ResepManager({
         <>
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <h2 className="section-title" style={{ fontSize: "1rem", marginBottom: 0 }}>Bahan-bahan</h2>
-              <button
-                onClick={() => {
-                  if (confirm("Hapus resep ini?")) {
-                    startTransition(() => deleteRecipe(selectedRecipe.id));
-                    setSelectedRecipeId(null);
-                  }
-                }}
-                disabled={isPending}
-                style={{ background: "none", border: "none", color: "#ef4444", fontSize: "0.75rem", cursor: "pointer" }}
-              >
-                Hapus Resep
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <h2 className="section-title" style={{ fontSize: "1rem", marginBottom: 0 }}>Bahan-bahan</h2>
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <button
+                  onClick={openEditRecipeName}
+                  style={{
+                    background: "none", border: "none",
+                    color: "var(--accent-color)",
+                    fontSize: "0.75rem", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: "0.25rem"
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Rename
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("Hapus resep ini?")) {
+                      startTransition(() => deleteRecipe(selectedRecipe.id));
+                      setSelectedRecipeId(null);
+                    }
+                  }}
+                  disabled={isPending}
+                  style={{ background: "none", border: "none", color: "#ef4444", fontSize: "0.75rem", cursor: "pointer" }}
+                >
+                  Hapus Resep
+                </button>
+              </div>
             </div>
 
             {selectedRecipe.ingredients.length === 0 ? (
@@ -148,8 +236,18 @@ export default function ResepManager({
 
                   return (
                     <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: "0.875rem", fontWeight: "500" }}>{item.ingredient.name}</div>
+                      <div
+                        style={{ cursor: "pointer", flex: 1 }}
+                        onClick={() => openEditIngredient(item)}
+                        title="Klik untuk edit jumlah"
+                      >
+                        <div style={{ fontSize: "0.875rem", fontWeight: "500", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                          {item.ingredient.name}
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </div>
                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
                           {item.amount} {item.ingredient.unit} × Rp {Math.round(costPerUnit)}
                         </div>
@@ -231,11 +329,14 @@ export default function ResepManager({
 
       {/* Modal Tambah Resep */}
       {isRecipeModalOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100,
-          display: "flex", alignItems: "flex-end", justifyContent: "center"
-        }}>
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100,
+            display: "flex", alignItems: "flex-end", justifyContent: "center"
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setIsRecipeModalOpen(false); }}
+        >
           <div style={{
             backgroundColor: "var(--bg-color)", width: "100%", maxWidth: "480px",
             borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "1.5rem",
@@ -256,13 +357,110 @@ export default function ResepManager({
         </div>
       )}
 
+      {/* Modal Edit Nama Resep */}
+      {isEditRecipeNameOpen && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100,
+            display: "flex", alignItems: "flex-end", justifyContent: "center"
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setIsEditRecipeNameOpen(false); }}
+        >
+          <div style={{
+            backgroundColor: "var(--bg-color)", width: "100%", maxWidth: "480px",
+            borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "1.5rem",
+            animation: "slideUp 0.3s ease-out"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h2 className="section-title" style={{ marginBottom: 0 }}>Edit Nama Resep</h2>
+              <button onClick={() => setIsEditRecipeNameOpen(false)} style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer" }}>&times;</button>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Nama Resep</label>
+              <input
+                type="text"
+                className="form-control"
+                value={editRecipeName}
+                onChange={(e) => setEditRecipeName(e.target.value)}
+                required
+              />
+            </div>
+            <button
+              onClick={handleUpdateRecipeName}
+              className="btn btn-primary"
+              disabled={isPending}
+            >
+              {isPending ? "Menyimpan..." : "Simpan Perubahan"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Jumlah Bahan di Resep */}
+      {isEditIngredientOpen && editingIngredient && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100,
+            display: "flex", alignItems: "flex-end", justifyContent: "center"
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setIsEditIngredientOpen(false); setEditingIngredient(null); } }}
+        >
+          <div style={{
+            backgroundColor: "var(--bg-color)", width: "100%", maxWidth: "480px",
+            borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "1.5rem",
+            animation: "slideUp 0.3s ease-out"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h2 className="section-title" style={{ marginBottom: 0 }}>Edit Jumlah Bahan</h2>
+              <button
+                onClick={() => { setIsEditIngredientOpen(false); setEditingIngredient(null); }}
+                style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer" }}
+              >&times;</button>
+            </div>
+            <div style={{
+              padding: "0.75rem 1rem",
+              backgroundColor: "var(--color-slate-100)",
+              borderRadius: "8px",
+              marginBottom: "1rem",
+              fontSize: "0.875rem",
+              color: "var(--text-secondary)"
+            }}>
+              Bahan: <strong style={{ color: "var(--text-primary)" }}>{editingIngredient.name}</strong>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Jumlah Pemakaian ({editingIngredient.unit})</label>
+              <input
+                type="number"
+                className="form-control"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+                min="1"
+                required
+              />
+            </div>
+            <button
+              onClick={handleUpdateIngredientAmount}
+              className="btn btn-primary"
+              disabled={isPending}
+            >
+              {isPending ? "Menyimpan..." : "Simpan Perubahan"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal Tambah Bahan ke Resep */}
       {isIngredientModalOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100,
-          display: "flex", alignItems: "flex-end", justifyContent: "center"
-        }}>
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100,
+            display: "flex", alignItems: "flex-end", justifyContent: "center"
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setIsIngredientModalOpen(false); }}
+        >
           <div style={{
             backgroundColor: "var(--bg-color)", width: "100%", maxWidth: "480px",
             borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "1.5rem",
