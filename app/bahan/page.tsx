@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { deleteIngredient } from "@/app/actions/ingredient";
 import FormTambahBahan from "./FormTambahBahan";
-import TombolHapus from "./TombolHapus";
+import BahanCard from "./BahanCard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,29 +40,9 @@ export default async function BahanBaku() {
             Belum ada data bahan baku. Silakan tambah baru.
           </div>
         ) : (
-          ingredients.map((item) => {
-            const hargaPerSatuan = Math.round(item.purchasePrice / item.purchaseAmount);
-            
-            return (
-              <div key={item.id} className="card" style={{ marginBottom: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontWeight: "600", fontSize: "1.125rem" }}>{item.name}</div>
-                    <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                      Beli: Rp {item.purchasePrice.toLocaleString("id-ID")} / {item.purchaseAmount} {item.unit}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <TombolHapus id={item.id} />
-                  </div>
-                </div>
-                <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px dashed var(--border-color)", display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>Harga per {item.unit}:</span>
-                  <span style={{ fontWeight: "600", color: "var(--accent-color)" }}>Rp {hargaPerSatuan}</span>
-                </div>
-              </div>
-            );
-          })
+          ingredients.map((item) => (
+            <BahanCard key={item.id} item={item} />
+          ))
         )}
       </div>
 

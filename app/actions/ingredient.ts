@@ -25,9 +25,34 @@ export async function createIngredient(formData: FormData) {
   revalidatePath("/bahan");
 }
 
+export async function updateIngredient(id: string, formData: FormData) {
+  const name = formData.get("name") as string;
+  const purchasePrice = parseInt(formData.get("purchasePrice") as string);
+  const purchaseAmount = parseInt(formData.get("purchaseAmount") as string);
+  const unit = formData.get("unit") as string;
+
+  if (!name || isNaN(purchasePrice) || isNaN(purchaseAmount) || !unit) {
+    throw new Error("Data tidak valid. Harap isi semua kolom dengan benar.");
+  }
+
+  await prisma.ingredient.update({
+    where: { id },
+    data: {
+      name,
+      purchasePrice,
+      purchaseAmount,
+      unit,
+    },
+  });
+
+  revalidatePath("/bahan");
+  revalidatePath("/resep");
+}
+
 export async function deleteIngredient(id: string) {
   await prisma.ingredient.delete({
     where: { id },
   });
   revalidatePath("/bahan");
+  revalidatePath("/resep");
 }
